@@ -34,6 +34,13 @@ def get_cancel_keyboard() -> ReplyKeyboardMarkup:
     )
 
 
+def get_cancel_inline_keyboard() -> InlineKeyboardMarkup:
+    """Get inline keyboard with cancel button (for edit_text)."""
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="❌ Отмена", callback_data="cancel_add")]
+    ])
+
+
 def get_add_choose_keyboard() -> InlineKeyboardMarkup:
     """Keyboard for choosing add method."""
     return InlineKeyboardMarkup(inline_keyboard=[

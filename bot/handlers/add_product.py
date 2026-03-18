@@ -10,7 +10,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 
 from ..services.api_client import APIClient
-from ..keyboards.main_menu import get_main_keyboard, get_cancel_keyboard, get_add_choose_keyboard
+from ..keyboards.main_menu import get_main_keyboard, get_cancel_keyboard, get_cancel_inline_keyboard, get_add_choose_keyboard
 from ..keyboards.categories import get_categories_keyboard
 
 logger = logging.getLogger(__name__)
@@ -86,7 +86,7 @@ async def add_manually(callback: CallbackQuery, state: FSMContext, api_client: A
     await state.clear()
     await state.set_state(AddProductState.name)
     
-    await callback.message.edit_text(ENTER_NAME, reply_markup=get_cancel_keyboard())
+    await callback.message.edit_text(ENTER_NAME, reply_markup=get_cancel_inline_keyboard())
     await callback.answer()
 
 
@@ -217,3 +217,12 @@ async def cancel_add(message: Message, state: FSMContext):
     """Cancel add product dialog."""
     await state.clear()
     await message.answer(CANCELLED, reply_markup=get_main_keyboard())
+
+
+@router.callback_query(F.data == "cancel_add")
+async def cancel_add_callback(callback: CallbackQuery, state: FSMContext):
+    """Cancel add product dialog via inline button."""
+    await state.clear()
+    await callback.message.edit_text(CANCELLED, reply_markup=None)
+    await callback.message.answer("Выберите действие:", reply_markup=get_main_keyboard())
+    await callback.answer()
