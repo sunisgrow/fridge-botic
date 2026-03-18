@@ -1,0 +1,49 @@
+# FastAPI and ASGI
+fastapi==0.109.0
+uvicorn[standard]==0.27.0
+pydantic==2.5.3
+pydantic-settings==2.1.0
+python-multipart==0.0.6
+
+# Database
+sqlalchemy[asyncio]==2.0.25
+asyncpg==0.29.0
+alembic==1.13.1
+
+# Telegram Bot
+aiogram==3.4.1
+
+# HTTP Client
+httpx==0.26.0
+
+# Redis
+redis==5.0.1
+aioredis==2.0.1
+
+# Image Processing (for future DataMatrix scanning)
+opencv-python-headless==4.9.0.80
+numpy==1.26.3
+Pillow==10.2.0
+
+# ZXing for barcode/DataMatrix decoding
+zxing-cpp==2.1.0
+
+# Utilities
+python-dateutil==2.8.2
+python-dotenv==1.0.0
+
+# Testing
+pytest==7.4.4
+pytest-asyncio==0.23.3
+pytest-cov==4.1.0
+httpx==0.26.0
+
+# Code Quality
+black==24.1.1
+flake8==7.0.0
+mypy==1.8.0
+
+# Type stubs
+types-python-dateutil==2.8.19.20240106
+types-redis==4.6.0.20240106
+

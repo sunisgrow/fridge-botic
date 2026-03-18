@@ -1,0 +1,182 @@
+[
+  {
+    "name": "Молоко",
+    "category_id": 1,
+    "default_shelf_life_days": 7
+  },
+  {
+    "name": "Кефир",
+    "category_id": 1,
+    "default_shelf_life_days": 14
+  },
+  {
+    "name": "Сметана",
+    "category_id": 1,
+    "default_shelf_life_days": 14
+  },
+  {
+    "name": "Творог",
+    "category_id": 1,
+    "default_shelf_life_days": 7
+  },
+  {
+    "name": "Йогурт",
+    "category_id": 1,
+    "default_shelf_life_days": 21
+  },
+  {
+    "name": "Сыр",
+    "category_id": 1,
+    "default_shelf_life_days": 30
+  },
+  {
+    "name": "Сливочное масло",
+    "category_id": 1,
+    "default_shelf_life_days": 60
+  },
+  {
+    "name": "Куриная грудка",
+    "category_id": 2,
+    "default_shelf_life_days": 3
+  },
+  {
+    "name": "Говядина",
+    "category_id": 2,
+    "default_shelf_life_days": 3
+  },
+  {
+    "name": "Свинина",
+    "category_id": 2,
+    "default_shelf_life_days": 3
+  },
+  {
+    "name": "Колбаса",
+    "category_id": 2,
+    "default_shelf_life_days": 14
+  },
+  {
+    "name": "Сосиски",
+    "category_id": 2,
+    "default_shelf_life_days": 14
+  },
+  {
+    "name": "Форель",
+    "category_id": 3,
+    "default_shelf_life_days": 2
+  },
+  {
+    "name": "Семга",
+    "category_id": 3,
+    "default_shelf_life_days": 2
+  },
+  {
+    "name": "Минтай",
+    "category_id": 3,
+    "default_shelf_life_days": 2
+  },
+  {
+    "name": "Помидоры",
+    "category_id": 4,
+    "default_shelf_life_days": 7
+  },
+  {
+    "name": "Огурцы",
+    "category_id": 4,
+    "default_shelf_life_days": 7
+  },
+  {
+    "name": "Картофель",
+    "category_id": 4,
+    "default_shelf_life_days": 30
+  },
+  {
+    "name": "Морковь",
+    "category_id": 4,
+    "default_shelf_life_days": 30
+  },
+  {
+    "name": "Лук",
+    "category_id": 4,
+    "default_shelf_life_days": 60
+  },
+  {
+    "name": "Капуста",
+    "category_id": 4,
+    "default_shelf_life_days": 14
+  },
+  {
+    "name": "Яблоки",
+    "category_id": 5,
+    "default_shelf_life_days": 30
+  },
+  {
+    "name": "Бананы",
+    "category_id": 5,
+    "default_shelf_life_days": 5
+  },
+  {
+    "name": "Апельсины",
+    "category_id": 5,
+    "default_shelf_life_days": 14
+  },
+  {
+    "name": "Сок",
+    "category_id": 6,
+    "default_shelf_life_days": 7
+  },
+  {
+    "name": "Кола",
+    "category_id": 6,
+    "default_shelf_life_days": 365
+  },
+  {
+    "name": "Майонез",
+    "category_id": 7,
+    "default_shelf_life_days": 90
+  },
+  {
+    "name": "Кетчуп",
+    "category_id": 7,
+    "default_shelf_life_days": 90
+  },
+  {
+    "name": "Мороженое",
+    "category_id": 8,
+    "default_shelf_life_days": 180
+  },
+  {
+    "name": "Пельмени",
+    "category_id": 8,
+    "default_shelf_life_days": 180
+  },
+  {
+    "name": "Хлеб белый",
+    "category_id": 9,
+    "default_shelf_life_days": 3
+  },
+  {
+    "name": "Хлеб черный",
+    "category_id": 9,
+    "default_shelf_life_days": 3
+  },
+  {
+    "name": "Батон",
+    "category_id": 9,
+    "default_shelf_life_days": 3
+  },
+  {
+    "name": "Чипсы",
+    "category_id": 10,
+    "default_shelf_life_days": 180
+  },
+  {
+    "name": "Шоколад",
+    "category_id": 10,
+    "default_shelf_life_days": 365
+  },
+  {
+    "name": "Яйца",
+    "category_id": 11,
+    "default_shelf_life_days": 21
+  }
+]

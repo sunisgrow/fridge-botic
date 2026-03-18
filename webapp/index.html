@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <title>Сканер товаров</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+</head>
+<body>
+    <div id="app">
+        <header class="header">
+            <h1>📷 Сканер товаров</h1>
+            <p>Наведите камеру на код</p>
+        </header>
+
+        <div id="reader" class="reader"></div>
+
+        <div id="result" class="result hidden">
+            <div class="result-icon">✅</div>
+            <div class="result-label">Код найден!</div>
+            <div id="result-text" class="result-text"></div>
+            <div id="result-format" class="result-format"></div>
+        </div>
+
+        <div id="error" class="error hidden">
+            <div class="error-icon">❌</div>
+            <div id="error-text">Ошибка</div>
+        </div>
+
+        <div class="controls">
+            <button id="startBtn" class="btn btn-primary">
+                ▶️ Начать сканирование
+            </button>
+            <button id="stopBtn" class="btn btn-secondary hidden">
+                ⏹️ Остановить
+            </button>
+            <button id="torchBtn" class="btn btn-icon hidden">
+                🔦 Фонарик
+            </button>
+        </div>
+
+        <div class="status" id="status">
+            <span class="status-dot"></span>
+            <span class="status-text">Готов к сканированию</span>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
