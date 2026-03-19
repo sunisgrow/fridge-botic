@@ -12,7 +12,7 @@ class Settings(BaseSettings):
 
     # API
     API_URL: str = "http://localhost:8000/api/v1"
-    API_EXTERNAL_URL: str = "http://localhost:8000"
+    API_EXTERNAL_URL: str = "http://localhost:8080"
 
     # Database
     DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/fridge_bot"
