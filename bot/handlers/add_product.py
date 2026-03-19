@@ -12,6 +12,8 @@ from aiogram.fsm.state import State, StatesGroup
 from ..services.api_client import APIClient
 from ..keyboards.main_menu import get_main_keyboard, get_cancel_keyboard, get_cancel_inline_keyboard, get_add_choose_keyboard
 from ..keyboards.categories import get_categories_keyboard
+from ..keyboards.scan_keyboard import get_scan_webapp_keyboard
+from ..config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -59,17 +61,33 @@ async def start_add_product(message: Message, state: FSMContext):
 
 
 @router.callback_query(F.data == "add_choose_scan")
-async def add_by_scan(callback: CallbackQuery, state: FSMContext, api_client: APIClient):
-    """Start scanning to add product."""
+async def add_by_scan(callback: CallbackQuery, state: FSMContext):
+    """Start scanning via Mini App."""
+    from .scan_product import ScanStates
+    
     telegram_id = callback.from_user.id
-    logger.info(f"User {telegram_id} chose scan method")
+    logger.info(f"User {telegram_id} chose scan via Mini App")
     
-    # Clear state and set scanning state
     await state.clear()
+    await state.set_state(ScanStates.waiting_for_photo)
     
-    # Import here to avoid circular import
+    webapp_url = settings.API_EXTERNAL_URL + '/webapp'
+    await callback.message.answer(
+        "📷 Нажмите кнопку ниже для запуска сканера",
+        reply_markup=get_scan_webapp_keyboard(webapp_url)
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data == "add_choose_photo")
+async def add_by_photo(callback: CallbackQuery, state: FSMContext):
+    """Start scanning via photo upload."""
     from .scan_product import ScanStates, SCAN_START
     
+    telegram_id = callback.from_user.id
+    logger.info(f"User {telegram_id} chose scan via photo")
+    
+    await state.clear()
     await state.set_state(ScanStates.waiting_for_photo)
     
     await callback.message.edit_text(SCAN_START)

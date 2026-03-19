@@ -45,7 +45,10 @@ def get_add_choose_keyboard() -> InlineKeyboardMarkup:
     """Keyboard for choosing add method."""
     return InlineKeyboardMarkup(inline_keyboard=[
         [
-            InlineKeyboardButton(text="📷 Сканировать", callback_data="add_choose_scan"),
+            InlineKeyboardButton(text="📷 Сканировать код", callback_data="add_choose_scan"),
+            InlineKeyboardButton(text="📸 Загрузить фото", callback_data="add_choose_photo")
+        ],
+        [
             InlineKeyboardButton(text="✏️ Вручную", callback_data="add_choose_manual")
         ]
     ])
