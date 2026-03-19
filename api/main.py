@@ -107,6 +107,7 @@ WEBAPP_DIR = Path(__file__).parent.parent / "webapp"
 
 
 @app.get("/webapp")
+@app.get("/webapp/")
 async def webapp_index():
     """Serve WebApp index."""
     index_file = WEBAPP_DIR / "index.html"
