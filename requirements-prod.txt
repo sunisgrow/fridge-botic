@@ -1,0 +1,34 @@
+# Production dependencies only - for Docker containers
+
+# FastAPI and ASGI
+fastapi==0.109.0
+uvicorn[standard]==0.27.0
+pydantic==2.5.3
+pydantic-settings==2.1.0
+python-multipart==0.0.6
+
+# Database
+sqlalchemy[asyncio]==2.0.25
+asyncpg==0.29.0
+alembic==1.13.1
+
+# Telegram Bot
+aiogram==3.4.1
+
+# HTTP Client
+httpx==0.26.0
+
+# Redis
+redis==5.0.1
+
+# Image Processing
+opencv-python-headless==4.9.0.80
+numpy==1.26.3
+Pillow==10.2.0
+
+# ZXing for barcode/DataMatrix decoding
+zxing-cpp==2.1.0
+
+# Utilities
+python-dateutil==2.8.2
+python-dotenv==1.0.0

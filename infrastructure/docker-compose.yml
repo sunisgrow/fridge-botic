@@ -51,6 +51,8 @@ services:
       - LOG_LEVEL=INFO
     ports:
       - "8000:8000"
+    volumes:
+      - webapp_data:/app/webapp
     depends_on:
       postgres:
         condition: service_healthy
@@ -82,6 +84,7 @@ services:
 volumes:
   postgres_data:
   redis_data:
+  webapp_data:
 
 networks:
   fridge_network:
