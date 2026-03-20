@@ -68,7 +68,7 @@ services:
     environment:
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
       - API_URL=http://api:8000/api/v1
-      - API_EXTERNAL_URL=http://fridgebot.spacetechnology.net:8080
+      - API_EXTERNAL_URL=https://fridgebot.spacetechnology.net:8443
       - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       - REDIS_URL=redis://redis:6379/0
       - LOG_LEVEL=INFO
