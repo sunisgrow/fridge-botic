@@ -72,8 +72,7 @@ async def add_by_scan(callback: CallbackQuery, state: FSMContext):
     await state.set_state(ScanStates.waiting_for_photo)
     
     webapp_url = settings.API_EXTERNAL_URL + '/webapp'
-    await callback.message.answer(
-        "📷 Нажмите кнопку ниже для запуска сканера",
+    await callback.message.edit_reply_markup(
         reply_markup=get_scan_webapp_keyboard(webapp_url)
     )
     await callback.answer()

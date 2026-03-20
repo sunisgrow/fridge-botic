@@ -25,10 +25,3 @@ def get_scan_confirm_keyboard():
             InlineKeyboardButton(text="❌ Отмена", callback_data="scan_cancel")
         ]
     ])
-
-
-def get_scan_cancel_keyboard():
-    """Keyboard for cancelling scan."""
-    return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="❌ Отмена", callback_data="scan_cancel")]
-    ])
