@@ -89,6 +89,7 @@ async def start_scan_webapp(message: Message, state: FSMContext):
     logger.info(f"User {message.from_user.id} started webapp scan")
     
     await state.clear()
+    await state.set_state(ScanStates.waiting_for_photo)
     
     webapp_url = settings.API_EXTERNAL_URL + '/webapp'
     await message.answer(

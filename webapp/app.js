@@ -5,6 +5,7 @@ let html5Qrcode = null;
 let isScanning = false;
 let currentCameraId = null;
 let torchAvailable = false;
+let cachedCameras = null;
 
 // Initialize Telegram WebApp
 const tg = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
@@ -206,8 +207,12 @@ async function startScanner() {
     updateStatus('Запрос доступа к камере...', true);
     
     try {
-        // Получаем список доступных камер
-        const cameras = await Html5Qrcode.getCameras();
+        // Получаем список доступных камер (используем кэш если есть)
+        let cameras = cachedCameras;
+        if (!cameras) {
+            cameras = await Html5Qrcode.getCameras();
+            cachedCameras = cameras;
+        }
         console.log('Available cameras:', cameras);
         
         if (!cameras || cameras.length === 0) {
@@ -425,14 +430,12 @@ async function checkCameraSupport() {
         return;
     }
     
-    updateStatus('Проверка камеры...', true);
-    
+    // Кэшируем список камер сразу (один раз запросит разрешение)
     try {
-        // Проверяем доступность камер
-        const cameras = await Html5Qrcode.getCameras();
-        console.log('Cameras found:', cameras.length);
+        cachedCameras = await Html5Qrcode.getCameras();
+        console.log('Cameras found:', cachedCameras.length);
         
-        if (cameras && cameras.length > 0) {
+        if (cachedCameras && cachedCameras.length > 0) {
             updateStatus('✅ Камера готова. Нажмите "Начать сканирование"');
             
             // Показываем уведомление в Telegram
@@ -449,12 +452,7 @@ async function checkCameraSupport() {
         }
     } catch (err) {
         console.error('Camera check failed:', err);
-        updateStatus('⚠️ Не удалось проверить камеру', false, true);
-        
-        // На Android/iOS может потребоваться разрешение
-        if (tg && (tg.platform === 'android' || tg.platform === 'ios')) {
-            updateStatus('Нажмите "Начать сканирование" для запроса доступа к камере');
-        }
+        updateStatus('Нажмите "Начать сканирование" для доступа к камере', true);
     }
 }
 
