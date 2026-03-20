@@ -1,0 +1,21 @@
+{
+  "name": "Сканер товаров",
+  "short_name": "Сканер",
+  "description": "Сканер DataMatrix, QR и EAN кодов для холодильника",
+  "background_color": "#ffffff",
+  "theme_color": "#2196F3",
+  "display": "standalone",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

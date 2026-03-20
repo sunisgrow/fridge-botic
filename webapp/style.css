@@ -263,3 +263,130 @@ html, body {
 html {
     padding-bottom: env(safe-area-inset-bottom);
 }
+/* Добавьте в конец style.css */
+.reader {
+    width: 100%;
+    max-width: 500px;
+    margin: 0 auto;
+    background: #000;
+    border-radius: 16px;
+    overflow: hidden;
+}
+
+#reader video {
+    width: 100%;
+    height: auto;
+    border-radius: 12px;
+}
+
+.btn {
+    touch-action: manipulation;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn:active {
+    transform: scale(0.98);
+}
+
+.status-dot {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background-color: #ccc;
+    margin-right: 8px;
+}
+
+.status-dot.active {
+    background-color: #4caf50;
+    animation: pulse 1.5s infinite;
+}
+
+.status-dot.error {
+    background-color: #f44336;
+}
+
+@keyframes pulse {
+    0% {
+        box-shadow: 0 0 0 0 rgba(76, 175, 80, 0.7);
+    }
+    70% {
+        box-shadow: 0 0 0 10px rgba(76, 175, 80, 0);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(76, 175, 80, 0);
+    }
+}
+
+.error {
+    background: linear-gradient(135deg, #ff6b6b, #ff4757);
+    color: white;
+    padding: 16px;
+    border-radius: 12px;
+    margin: 16px;
+    text-align: center;
+}
+
+.result {
+    background: linear-gradient(135deg, #51cf66, #37b24d);
+    color: white;
+    padding: 16px;
+    border-radius: 12px;
+    margin: 16px;
+    text-align: center;
+}
+
+.result-text {
+    font-size: 18px;
+    font-weight: bold;
+    word-break: break-all;
+    margin-top: 8px;
+}
+
+.result-format {
+    font-size: 12px;
+    opacity: 0.9;
+    margin-top: 4px;
+}
+
+.controls {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    margin: 20px 16px;
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    color: white;
+    border: none;
+    padding: 12px 24px;
+    border-radius: 50px;
+    font-size: 16px;
+    font-weight: bold;
+}
+
+.btn-secondary {
+    background: #6c757d;
+    color: white;
+    border: none;
+    padding: 12px 24px;
+    border-radius: 50px;
+    font-size: 16px;
+    font-weight: bold;
+}
+
+.btn-icon {
+    background: #ffd43b;
+    color: #2d3436;
+    border: none;
+    padding: 12px 20px;
+    border-radius: 50px;
+    font-size: 16px;
+    font-weight: bold;
+}
+
+.hidden {
+    display: none;
+}

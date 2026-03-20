@@ -1,22 +1,23 @@
 // Mini App for DataMatrix/QR/EAN scanning
 // Uses html5-qrcode library and Telegram WebApp SDK
 
-let html5QrcodeScanner = null;
+let html5Qrcode = null;
 let isScanning = false;
+let currentCameraId = null;
+let torchAvailable = false;
 
 // Initialize Telegram WebApp
-if (window.Telegram && window.Telegram.WebApp) {
-    const tg = window.Telegram.WebApp;
-    tg.expand();
-    tg.ready();
+const tg = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
+
+if (tg) {
+    tg.expand(); // Разворачиваем на весь экран
+    tg.ready(); // Сообщаем, что приложение готово
+    console.log('Telegram WebApp initialized', tg.platform, 'version:', tg.version);
     
-    // Request camera access
-    tg.requestCameraAccess().then(() => {
-        console.log('Camera access granted');
-        updateStatus('Камера найдена. Нажмите "Начать сканирование"');
-    }).catch((err) => {
-        console.error('Camera access denied:', err);
-        showError('Доступ к камере запрещён. Разрешите доступ в настройках Telegram.');
+    // Настраиваем основную кнопку Telegram
+    tg.MainButton.setText('Сканировать').hide();
+    tg.onEvent('mainButtonClicked', () => {
+        startScanner();
     });
 }
 
@@ -33,38 +34,60 @@ const statusDiv = document.getElementById('status');
 const readerDiv = document.getElementById('reader');
 
 // Audio for beep
-const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+let audioContext = null;
+
+function initAudio() {
+    if (!audioContext && window.AudioContext) {
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        // Resume on user interaction
+        if (audioContext.state === 'suspended') {
+            audioContext.resume();
+        }
+    }
+    return audioContext;
+}
 
 function playBeep() {
-    const oscillator = audioContext.createOscillator();
-    const gainNode = audioContext.createGain();
-    
-    oscillator.connect(gainNode);
-    gainNode.connect(audioContext.destination);
-    
-    oscillator.frequency.value = 1800;
-    oscillator.type = 'sine';
-    
-    gainNode.gain.setValueAtTime(0.5, audioContext.currentTime);
-    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.15);
-    
-    oscillator.start(audioContext.currentTime);
-    oscillator.stop(audioContext.currentTime + 0.15);
+    try {
+        const ctx = initAudio();
+        if (!ctx) return;
+        
+        const oscillator = ctx.createOscillator();
+        const gainNode = ctx.createGain();
+        
+        oscillator.connect(gainNode);
+        gainNode.connect(ctx.destination);
+        
+        oscillator.frequency.value = 1800;
+        oscillator.type = 'sine';
+        
+        gainNode.gain.setValueAtTime(0.3, ctx.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.15);
+        
+        oscillator.start(ctx.currentTime);
+        oscillator.stop(ctx.currentTime + 0.15);
+    } catch (e) {
+        console.log('Audio not supported:', e);
+    }
 }
 
 function playSuccess() {
     playBeep();
     setTimeout(playBeep, 100);
-    setTimeout(playBeep, 200);
 }
 
 function updateStatus(text, isActive = false, isError = false) {
     const dot = statusDiv.querySelector('.status-dot');
     const textSpan = statusDiv.querySelector('.status-text');
     
-    textSpan.textContent = text;
-    dot.classList.toggle('active', isActive);
-    dot.classList.toggle('error', isError);
+    if (textSpan) {
+        textSpan.textContent = text;
+    }
+    if (dot) {
+        dot.classList.toggle('active', isActive);
+        dot.classList.toggle('error', isError);
+    }
+    console.log('Status:', text);
 }
 
 function showResult(text, format) {
@@ -80,13 +103,19 @@ function showResult(text, format) {
     sendToBot(text, format);
 }
 
-function showError(text) {
+function showError(text, isPermanent = false) {
     errorText.textContent = text;
     
     errorDiv.classList.remove('hidden');
     resultDiv.classList.add('hidden');
     
     updateStatus(text, false, true);
+    
+    if (!isPermanent) {
+        setTimeout(() => {
+            errorDiv.classList.add('hidden');
+        }, 5000);
+    }
 }
 
 function sendToBot(text, format) {
@@ -96,16 +125,15 @@ function sendToBot(text, format) {
     let rawData = text;
     
     // Try to parse GS1 format
-    // Format: (01)04607163091577(21)5nf+.FSH8B%NW(93)0bBq
     const gtinMatch = text.match(/\(01\)(\d{14})/);
     if (gtinMatch) {
         gtin = gtinMatch[1];
     } else if (text.match(/^\d{14}$/)) {
         gtin = text;
     } else if (text.match(/^\d{13}$/)) {
-        gtin = '0' + text; // EAN-13 needs leading zero for GTIN-14
+        gtin = '0' + text;
     } else if (text.match(/^\d{8}$/)) {
-        gtin = '000000' + text; // EAN-8 to GTIN-14
+        gtin = '000000' + text;
     }
     
     const serialMatch = text.match(/\(21\)([^(\)]+)/);
@@ -117,21 +145,57 @@ function sendToBot(text, format) {
         raw: rawData,
         format: format,
         gtin: gtin,
-        serial: serial
+        serial: serial,
+        timestamp: new Date().toISOString()
     };
     
     console.log('Sending to bot:', result);
     
-    if (window.Telegram && window.Telegram.WebApp) {
-        window.Telegram.WebApp.sendData(JSON.stringify(result));
+    if (tg) {
+        // Отправляем данные в бот
+        tg.sendData(JSON.stringify(result));
+        updateStatus('Код отправлен!', false);
+        
+        // Показываем уведомление через Telegram
+        tg.showPopup({
+            title: 'Успех',
+            message: `Код ${text.substring(0, 20)}${text.length > 20 ? '...' : ''} отправлен`,
+            buttons: [{type: 'ok'}]
+        });
+        
+        // Закрываем mini app через 1.5 секунды
         setTimeout(() => {
-            window.Telegram.WebApp.close();
-        }, 500);
+            tg.close();
+        }, 1500);
+    } else {
+        console.log('No Telegram WebApp available');
+        updateStatus('Код найден: ' + text.substring(0, 30), false);
     }
 }
 
-function startScanner() {
-    if (isScanning) return;
+async function startScanner() {
+    if (isScanning) {
+        console.log('Scanner already running');
+        return;
+    }
+    
+    // Проверяем поддержку getUserMedia
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        showError('Ваш браузер не поддерживает доступ к камере\n\nИспользуйте современный браузер (Chrome, Safari, Firefox)', true);
+        return;
+    }
+    
+    // Проверяем HTTPS (обязательно для getUserMedia)
+    if (location.protocol !== 'https:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
+        showError('Для доступа к камере требуется HTTPS соединение\n\nТекущий протокол: ' + location.protocol, true);
+        return;
+    }
+    
+    // Проверяем, что библиотека загружена
+    if (typeof Html5Qrcode === 'undefined') {
+        showError('Библиотека сканирования не загружена\nПроверьте интернет-соединение', true);
+        return;
+    }
     
     isScanning = true;
     resultDiv.classList.add('hidden');
@@ -139,66 +203,158 @@ function startScanner() {
     startBtn.classList.add('hidden');
     stopBtn.classList.remove('hidden');
     
-    updateStatus('Сканирование...', true);
+    updateStatus('Запрос доступа к камере...', true);
     
-    // Create scanner config
-    const config = {
-        fps: 10,
-        qrbox: {
-            width: 250,
-            height: 250
-        },
-        aspectRatio: 1.0,
-        supportedFormats: [
-            Html5QrcodeSupportedFormats.DATA_MATRIX,
-            Html5QrcodeSupportedFormats.QR_CODE,
-            Html5QrcodeSupportedFormats.EAN_13,
-            Html5QrcodeSupportedFormats.EAN_8,
-            Html5QrcodeSupportedFormats.UPC_A,
-            Html5QrcodeSupportedFormats.UPC_E,
-            Html5QrcodeSupportedFormats.CODE_128,
-            Html5QrcodeSupportedFormats.CODE_39,
-            Html5QrcodeSupportedFormats.CODE_93
-        ],
-        rememberLastUsedCamera: true
-    };
-    
-    html5QrcodeScanner = new Html5QrcodeScanner(
-        'reader',
-        config,
-        /* verbose= */ false
-    );
-    
-    html5QrcodeScanner.render(
-        (decodedText, decodedResult) => {
-            // Code found!
-            console.log('Code found:', decodedText, decodedResult.result.format);
-            
-            // Stop scanning
-            html5QrcodeScanner.clear();
-            isScanning = false;
-            
-            // Show result
-            const formatName = getFormatName(decodedResult.result.format);
-            showResult(decodedText, formatName);
-        },
-        (errorMessage) => {
-            // Ignore scan errors (they happen frequently when no code is in frame)
-            // console.log('Scan error:', errorMessage);
+    try {
+        // Получаем список доступных камер
+        const cameras = await Html5Qrcode.getCameras();
+        console.log('Available cameras:', cameras);
+        
+        if (!cameras || cameras.length === 0) {
+            throw new Error('Камеры не найдены на устройстве');
         }
-    );
+        
+        // Выбираем заднюю камеру если есть
+        const backCamera = cameras.find(camera => 
+            camera.label.toLowerCase().includes('back') || 
+            camera.label.toLowerCase().includes('environment') ||
+            camera.label.toLowerCase().includes('rear')
+        );
+        
+        currentCameraId = backCamera ? backCamera.id : cameras[0].id;
+        console.log('Selected camera:', currentCameraId);
+        
+        // Создаем конфигурацию для сканера
+        const config = {
+            fps: 15,
+            qrbox: { width: 280, height: 280 },
+            aspectRatio: 1.0,
+            rememberLastUsedCamera: true,
+            supportedFormats: [
+                Html5QrcodeSupportedFormats.DATA_MATRIX,
+                Html5QrcodeSupportedFormats.QR_CODE,
+                Html5QrcodeSupportedFormats.EAN_13,
+                Html5QrcodeSupportedFormats.EAN_8,
+                Html5QrcodeSupportedFormats.UPC_A,
+                Html5QrcodeSupportedFormats.UPC_E,
+                Html5QrcodeSupportedFormats.CODE_128,
+                Html5QrcodeSupportedFormats.CODE_39,
+                Html5QrcodeSupportedFormats.CODE_93
+            ]
+        };
+        
+        // Инициализируем сканер
+        html5Qrcode = new Html5Qrcode("reader");
+        
+        updateStatus('Запуск камеры...', true);
+        
+        // Запускаем сканирование
+        await html5Qrcode.start(
+            currentCameraId,
+            config,
+            (decodedText, decodedResult) => {
+                // Успешное сканирование
+                console.log('Code found:', decodedText);
+                
+                // Останавливаем сканирование
+                if (html5Qrcode && isScanning) {
+                    html5Qrcode.stop().then(() => {
+                        isScanning = false;
+                        startBtn.classList.remove('hidden');
+                        stopBtn.classList.add('hidden');
+                        torchBtn.classList.add('hidden');
+                        
+                        const formatName = getFormatName(decodedResult.result.format.formatName);
+                        showResult(decodedText, formatName);
+                    }).catch(err => {
+                        console.error('Error stopping scanner:', err);
+                        isScanning = false;
+                    });
+                }
+            },
+            (errorMessage) => {
+                // Игнорируем ошибки сканирования (они возникают постоянно)
+                // Но логируем для отладки
+                if (errorMessage && !errorMessage.includes('No MultiFormat')) {
+                    console.debug('Scan error:', errorMessage);
+                }
+            }
+        );
+        
+        updateStatus('Сканирование... Наведите камеру на штрихкод', true);
+        
+        // Проверяем поддержку фонарика
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({
+                video: { deviceId: { exact: currentCameraId } }
+            });
+            const track = stream.getVideoTracks()[0];
+            if (track) {
+                const capabilities = track.getCapabilities();
+                if (capabilities.torch) {
+                    torchAvailable = true;
+                    torchBtn.classList.remove('hidden');
+                    
+                    let torchOn = false;
+                    torchBtn.onclick = async () => {
+                        try {
+                            torchOn = !torchOn;
+                            await track.applyConstraints({
+                                advanced: [{ torch: torchOn }]
+                            });
+                            torchBtn.textContent = torchOn ? '🔦 Фонарик (вкл)' : '🔦 Фонарик';
+                        } catch (e) {
+                            console.log('Torch toggle failed:', e);
+                        }
+                    };
+                }
+            }
+            stream.getTracks().forEach(track => track.stop());
+        } catch (e) {
+            console.log('Torch not supported:', e);
+        }
+        
+    } catch (err) {
+        console.error('Failed to start scanner:', err);
+        isScanning = false;
+        startBtn.classList.remove('hidden');
+        stopBtn.classList.add('hidden');
+        
+        let errorMessage = 'Не удалось запустить камеру.\n\n';
+        
+        if (err.message && err.message.includes('Permission')) {
+            errorMessage += '❌ Разрешите доступ к камере:\n';
+            errorMessage += '• В Telegram: нажмите ⋮ → Настройки → Камера\n';
+            errorMessage += '• В браузере: нажмите на 🔒 в адресной строке\n';
+            errorMessage += '• Разрешите доступ и перезагрузите страницу';
+        } else if (err.message && err.message.includes('not found')) {
+            errorMessage += '📱 Камера не обнаружена на устройстве.\n';
+            errorMessage += 'Убедитесь, что камера работает и доступна.';
+        } else {
+            errorMessage += err.message || 'Неизвестная ошибка';
+        }
+        
+        showError(errorMessage, true);
+        updateStatus('Ошибка доступа к камере', false, true);
+    }
 }
 
-function stopScanner() {
+async function stopScanner() {
     if (!isScanning) return;
     
-    if (html5QrcodeScanner) {
-        html5QrcodeScanner.clear();
+    try {
+        if (html5Qrcode && html5Qrcode.isScanning) {
+            await html5Qrcode.stop();
+        }
+    } catch (err) {
+        console.error('Error stopping scanner:', err);
     }
     
     isScanning = false;
     startBtn.classList.remove('hidden');
     stopBtn.classList.add('hidden');
+    torchBtn.classList.add('hidden');
+    torchAvailable = false;
     
     updateStatus('Готов к сканированию');
 }
@@ -220,61 +376,104 @@ function getFormatName(format) {
 }
 
 // Event listeners
-startBtn.addEventListener('click', () => {
-    startScanner();
-});
+if (startBtn) {
+    startBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        startScanner();
+    });
+}
 
-stopBtn.addEventListener('click', () => {
-    stopScanner();
-});
+if (stopBtn) {
+    stopBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        stopScanner();
+    });
+}
 
-// Check if device supports camera
-async function checkCamera() {
-    try {
-        // Check if Telegram WebApp camera access is available
-        if (window.Telegram && window.Telegram.WebApp) {
-            const tg = window.Telegram.WebApp;
-            
-            // Check if we have camera permission
-            try {
-                await tg.requestCameraAccess();
-                updateStatus('Камера найдена. Нажмите "Начать сканирование"');
-                return;
-            } catch (e) {
-                showError('Доступ к камере запрещён. Разрешите доступ в настройках Telegram.');
-                return;
-            }
-        }
+// Проверка поддержки камеры при загрузке
+async function checkCameraSupport() {
+    console.log('Checking camera support...');
+    
+    // Проверяем наличие необходимых API
+    if (typeof Html5Qrcode === 'undefined') {
+        console.error('Html5Qrcode library not loaded');
+        updateStatus('Загрузка библиотеки...', false);
         
-        // Fallback: check devices directly
-        const devices = await Html5Qrcode.getCameras();
-        if (devices && devices.length > 0) {
-            updateStatus('Камера найдена. Нажмите "Начать сканирование"');
+        // Ждем загрузки библиотеки
+        let attempts = 0;
+        const checkInterval = setInterval(() => {
+            if (typeof Html5Qrcode !== 'undefined') {
+                clearInterval(checkInterval);
+                checkCameraSupport();
+            } else if (attempts++ > 20) {
+                clearInterval(checkInterval);
+                showError('Не удалось загрузить библиотеку сканирования\nПроверьте интернет-соединение', true);
+            }
+        }, 500);
+        return;
+    }
+    
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        showError('Ваш браузер не поддерживает доступ к камере\n\nРекомендуем использовать:\n• Chrome на Android\n• Safari на iOS\n• Telegram Desktop на ПК', true);
+        updateStatus('Камера не поддерживается', false, true);
+        return;
+    }
+    
+    if (location.protocol !== 'https:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
+        showError('⚠️ Для работы камеры требуется HTTPS\n\nТекущий протокол: ' + location.protocol, true);
+        updateStatus('Требуется HTTPS', false, true);
+        return;
+    }
+    
+    updateStatus('Проверка камеры...', true);
+    
+    try {
+        // Проверяем доступность камер
+        const cameras = await Html5Qrcode.getCameras();
+        console.log('Cameras found:', cameras.length);
+        
+        if (cameras && cameras.length > 0) {
+            updateStatus('✅ Камера готова. Нажмите "Начать сканирование"');
             
-            // Check for torch capability
-            const device = devices.find(d => d.label.toLowerCase().includes('back')) || devices[0];
-            if (device) {
-                try {
-                    const capabilities = await navigator.mediaDevices.getUserMedia({
-                        video: { deviceId: device.id }
-                    });
-                    const track = capabilities.getVideoTrack();
-                    const capabilities2 = track.getCapabilities();
-                    if (capabilities2.torch) {
-                        torchBtn.classList.remove('hidden');
-                    }
-                } catch (e) {
-                    // Torch not supported
-                }
+            // Показываем уведомление в Telegram
+            if (tg && tg.platform !== 'unknown') {
+                tg.showPopup({
+                    title: 'Готов к работе',
+                    message: 'Камера обнаружена. Нажмите кнопку "Начать сканирование" для запуска',
+                    buttons: [{type: 'ok'}]
+                });
             }
         } else {
-            showError('Камера не найдена');
+            updateStatus('❌ Камера не обнаружена', false, true);
+            showError('Камера не найдена на вашем устройстве\n\nУбедитесь, что:\n• Устройство имеет камеру\n• Доступ к камере разрешен\n• Вы используете поддерживаемый браузер');
         }
-    } catch (e) {
-        console.error('Camera check error:', e);
-        showError('Нет доступа к камере. Проверьте разрешения браузера.');
+    } catch (err) {
+        console.error('Camera check failed:', err);
+        updateStatus('⚠️ Не удалось проверить камеру', false, true);
+        
+        // На Android/iOS может потребоваться разрешение
+        if (tg && (tg.platform === 'android' || tg.platform === 'ios')) {
+            updateStatus('Нажмите "Начать сканирование" для запроса доступа к камере');
+        }
     }
 }
 
-// Initialize
-checkCamera();
+// Запускаем проверку после загрузки страницы
+window.addEventListener('load', () => {
+    console.log('Page loaded, initializing...');
+    checkCameraSupport();
+});
+
+// Обработка закрытия приложения
+if (tg) {
+    tg.onEvent('viewportChanged', () => {
+        console.log('Viewport changed');
+    });
+}
+
+// Экспортируем функции для отладки
+window.debugScanner = {
+    start: startScanner,
+    stop: stopScanner,
+    check: checkCameraSupport
+};
