@@ -82,15 +82,19 @@ async def start_scan(message: Message, state: FSMContext):
     await message.answer(SCAN_START)
 
 
-@router.callback_query(F.web_app_data)
+@router.callback_query()
 async def process_webapp_data(callback: CallbackQuery, state: FSMContext, api_client: APIClient):
     """Process data received from WebApp Mini App via callback_query."""
     telegram_id = callback.from_user.id
-    logger.info(f"Processing webapp data for user {telegram_id}")
+    logger.info(f"Callback received: data={callback.data}, web_app_data={callback.web_app_data}")
+    
+    if not callback.data:
+        await callback.answer()
+        return
     
     try:
         import json
-        webapp_data = json.loads(callback.web_app_data.data)
+        webapp_data = json.loads(callback.data)
         
         logger.info(f"WebApp scan data: {webapp_data}")
         
