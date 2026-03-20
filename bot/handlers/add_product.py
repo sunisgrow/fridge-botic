@@ -12,7 +12,6 @@ from aiogram.fsm.state import State, StatesGroup
 from ..services.api_client import APIClient
 from ..keyboards.main_menu import get_main_keyboard, get_cancel_keyboard, get_cancel_inline_keyboard, get_add_choose_keyboard
 from ..keyboards.categories import get_categories_keyboard
-from ..keyboards.scan_keyboard import get_scan_webapp_keyboard
 from ..config import settings
 
 logger = logging.getLogger(__name__)
@@ -53,29 +52,12 @@ async def start_add_product(message: Message, state: FSMContext):
     # Reset state
     await state.clear()
     
-    # Show choose method keyboard
+    # Show choose method keyboard with WebApp button
+    webapp_url = settings.API_EXTERNAL_URL + '/webapp'
     await message.answer(
         CHOOSE_ADD_METHOD,
-        reply_markup=get_add_choose_keyboard()
+        reply_markup=get_add_choose_keyboard(webapp_url)
     )
-
-
-@router.callback_query(F.data == "add_choose_scan")
-async def add_by_scan(callback: CallbackQuery, state: FSMContext):
-    """Start scanning via Mini App."""
-    from .scan_product import ScanStates
-    
-    telegram_id = callback.from_user.id
-    logger.info(f"User {telegram_id} chose scan via Mini App")
-    
-    await state.clear()
-    await state.set_state(ScanStates.waiting_for_photo)
-    
-    webapp_url = settings.API_EXTERNAL_URL + '/webapp'
-    await callback.message.edit_reply_markup(
-        reply_markup=get_scan_webapp_keyboard(webapp_url)
-    )
-    await callback.answer()
 
 
 @router.callback_query(F.data == "add_choose_photo")

@@ -1,6 +1,6 @@
 """Main menu keyboard."""
 
-from aiogram.types import KeyboardButton, ReplyKeyboardMarkup, InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.types import KeyboardButton, ReplyKeyboardMarkup, InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
 
 
 def get_main_keyboard() -> ReplyKeyboardMarkup:
@@ -41,11 +41,12 @@ def get_cancel_inline_keyboard() -> InlineKeyboardMarkup:
     ])
 
 
-def get_add_choose_keyboard() -> InlineKeyboardMarkup:
+def get_add_choose_keyboard(webapp_url: str = None) -> InlineKeyboardMarkup:
     """Keyboard for choosing add method."""
+    url = webapp_url or "https://fridge-bot.com/webapp"
     return InlineKeyboardMarkup(inline_keyboard=[
         [
-            InlineKeyboardButton(text="📷 Сканировать код", callback_data="add_choose_scan"),
+            InlineKeyboardButton(text="📷 Сканировать код", web_app=WebAppInfo(url=url)),
             InlineKeyboardButton(text="📸 Загрузить фото", callback_data="add_choose_photo")
         ],
         [
