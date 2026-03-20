@@ -1,13 +1,23 @@
 // Mini App for DataMatrix/QR/EAN scanning
-// Uses html5-qrcode library
+// Uses html5-qrcode library and Telegram WebApp SDK
 
 let html5QrcodeScanner = null;
 let isScanning = false;
 
 // Initialize Telegram WebApp
 if (window.Telegram && window.Telegram.WebApp) {
-    window.Telegram.WebApp.expand();
-    window.Telegram.WebApp.ready();
+    const tg = window.Telegram.WebApp;
+    tg.expand();
+    tg.ready();
+    
+    // Request camera access
+    tg.requestCameraAccess().then(() => {
+        console.log('Camera access granted');
+        updateStatus('Камера найдена. Нажмите "Начать сканирование"');
+    }).catch((err) => {
+        console.error('Camera access denied:', err);
+        showError('Доступ к камере запрещён. Разрешите доступ в настройках Telegram.');
+    });
 }
 
 // DOM Elements
@@ -92,6 +102,10 @@ function sendToBot(text, format) {
         gtin = gtinMatch[1];
     } else if (text.match(/^\d{14}$/)) {
         gtin = text;
+    } else if (text.match(/^\d{13}$/)) {
+        gtin = '0' + text; // EAN-13 needs leading zero for GTIN-14
+    } else if (text.match(/^\d{8}$/)) {
+        gtin = '000000' + text; // EAN-8 to GTIN-14
     }
     
     const serialMatch = text.match(/\(21\)([^(\)]+)/);
@@ -110,7 +124,9 @@ function sendToBot(text, format) {
     
     if (window.Telegram && window.Telegram.WebApp) {
         window.Telegram.WebApp.sendData(JSON.stringify(result));
-        window.Telegram.WebApp.close();
+        setTimeout(() => {
+            window.Telegram.WebApp.close();
+        }, 500);
     }
 }
 
@@ -215,6 +231,22 @@ stopBtn.addEventListener('click', () => {
 // Check if device supports camera
 async function checkCamera() {
     try {
+        // Check if Telegram WebApp camera access is available
+        if (window.Telegram && window.Telegram.WebApp) {
+            const tg = window.Telegram.WebApp;
+            
+            // Check if we have camera permission
+            try {
+                await tg.requestCameraAccess();
+                updateStatus('Камера найдена. Нажмите "Начать сканирование"');
+                return;
+            } catch (e) {
+                showError('Доступ к камере запрещён. Разрешите доступ в настройках Telegram.');
+                return;
+            }
+        }
+        
+        // Fallback: check devices directly
         const devices = await Html5Qrcode.getCameras();
         if (devices && devices.length > 0) {
             updateStatus('Камера найдена. Нажмите "Начать сканирование"');
@@ -239,7 +271,8 @@ async function checkCamera() {
             showError('Камера не найдена');
         }
     } catch (e) {
-        showError('Нет доступа к камере');
+        console.error('Camera check error:', e);
+        showError('Нет доступа к камере. Проверьте разрешения браузера.');
     }
 }
 
