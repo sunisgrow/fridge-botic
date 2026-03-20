@@ -1,9 +1,12 @@
 """Database session management."""
 
+import json
 import logging
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import AsyncGenerator
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 
 from ..config import settings
@@ -51,11 +54,55 @@ async def get_session() -> AsyncGenerator[AsyncSession, None]:
 async def init_db():
     """Initialize database tables."""
     from ..database.base import Base
+    from ..models.category import Category
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
     logger.info("Database tables created")
+
+    await _load_default_categories()
+
+
+async def _load_default_categories():
+    """Load default categories if database is empty."""
+    from ..models.category import Category
+
+    async with async_session_maker() as session:
+        result = await session.execute(select(Category).limit(1))
+        if result.scalar_one_or_none():
+            logger.info("Categories already exist, skipping load")
+            return
+
+    data_dir = Path(__file__).parent.parent.parent / "data"
+    categories_file = data_dir / "categories.json"
+
+    if not categories_file.exists():
+        logger.warning(f"Categories file not found: {categories_file}")
+        return
+
+    with open(categories_file, 'r', encoding='utf-8') as f:
+        categories = json.load(f)
+
+    async with async_session_maker() as session:
+        for cat_data in categories:
+            result = await session.execute(
+                select(Category).where(Category.id == cat_data['id'])
+            )
+            existing = result.scalar_one_or_none()
+
+            if not existing:
+                category = Category(
+                    id=cat_data['id'],
+                    name=cat_data['name'],
+                    icon=cat_data.get('icon')
+                )
+                session.add(category)
+                logger.info(f"Added category: {cat_data['name']}")
+
+        await session.commit()
+
+    logger.info(f"Loaded {len(categories)} default categories")
 
 
 async def close_db():
