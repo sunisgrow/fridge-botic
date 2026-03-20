@@ -13,8 +13,7 @@ from aiogram.fsm.state import State, StatesGroup
 
 from ..services.api_client import APIClient
 from ..keyboards.main_menu import get_main_keyboard
-from ..keyboards.scan_keyboard import get_scan_confirm_keyboard, get_scan_webapp_keyboard
-from ..config import settings
+from ..keyboards.scan_keyboard import get_scan_confirm_keyboard
 
 logger = logging.getLogger(__name__)
 
@@ -83,45 +82,31 @@ async def start_scan(message: Message, state: FSMContext):
     await message.answer(SCAN_START)
 
 
-@router.message(Command("scan_webapp"))
-async def start_scan_webapp(message: Message, state: FSMContext):
-    """Start scanning via WebApp Mini App."""
-    logger.info(f"User {message.from_user.id} started webapp scan")
-    
-    await state.clear()
-    await state.set_state(ScanStates.waiting_for_photo)
-    
-    webapp_url = settings.API_EXTERNAL_URL + '/webapp'
-    await message.answer(
-        "📷 Нажмите кнопку ниже для запуска сканера",
-        reply_markup=get_scan_webapp_keyboard(webapp_url)
-    )
-
-
-@router.message(ScanStates.waiting_for_photo, F.web_app_data)
-async def process_webapp_data(message: Message, state: FSMContext, api_client: APIClient):
-    """Process data received from WebApp Mini App."""
-    telegram_id = message.from_user.id
+@router.callback_query(F.web_app_data)
+async def process_webapp_data(callback: CallbackQuery, state: FSMContext, api_client: APIClient):
+    """Process data received from WebApp Mini App via callback_query."""
+    telegram_id = callback.from_user.id
     logger.info(f"Processing webapp data for user {telegram_id}")
     
     try:
         import json
-        webapp_data = json.loads(message.web_app_data.data)
+        webapp_data = json.loads(callback.web_app_data.data)
         
         logger.info(f"WebApp scan data: {webapp_data}")
         
-        processing_msg = await message.answer(SCAN_PROCESSING)
+        processing_msg = await callback.message.answer(SCAN_PROCESSING)
         
         raw_data = webapp_data.get('raw', '')
         gtin = webapp_data.get('gtin')
         
         if not gtin:
             await processing_msg.delete()
-            await message.answer(
+            await callback.message.answer(
                 "❌ Не удалось извлечь GTIN из кода. Попробуйте еще раз или введите вручную: /add",
                 reply_markup=get_main_keyboard()
             )
             await state.clear()
+            await callback.answer()
             return
         
         result = await api_client.lookup_product(
@@ -134,11 +119,12 @@ async def process_webapp_data(message: Message, state: FSMContext, api_client: A
         
         if not result.get('success'):
             await processing_msg.delete()
-            await message.answer(
+            await callback.message.answer(
                 PRODUCT_SCAN_ERROR.format(error=result.get('message', 'Unknown error')),
                 reply_markup=get_main_keyboard()
             )
             await state.clear()
+            await callback.answer()
             return
         
         if result.get('product_name'):
@@ -160,12 +146,12 @@ async def process_webapp_data(message: Message, state: FSMContext, api_client: A
             await state.update_data(scan_result=result)
             
             await processing_msg.delete()
-            await message.answer(text, reply_markup=get_scan_confirm_keyboard())
+            await callback.message.answer(text, reply_markup=get_scan_confirm_keyboard())
             await state.set_state(ScanStates.editing_product)
             
         else:
             await processing_msg.delete()
-            await message.answer(
+            await callback.message.answer(
                 PRODUCT_NOT_FOUND.format(
                     gtin=result.get('gtin', 'N/A'),
                     raw_data=result.get('raw_data', 'N/A')
@@ -173,21 +159,25 @@ async def process_webapp_data(message: Message, state: FSMContext, api_client: A
                 reply_markup=get_main_keyboard()
             )
             await state.clear()
+        
+        await callback.answer()
             
     except json.JSONDecodeError as e:
         logger.error(f"Invalid JSON from webapp: {e}")
-        await message.answer(
+        await callback.message.answer(
             PRODUCT_SCAN_ERROR.format(error="Invalid data received"),
             reply_markup=get_main_keyboard()
         )
         await state.clear()
+        await callback.answer()
     except Exception as e:
         logger.error(f"Error processing webapp data: {e}", exc_info=True)
-        await message.answer(
+        await callback.message.answer(
             PRODUCT_SCAN_ERROR.format(error=str(e)),
             reply_markup=get_main_keyboard()
         )
         await state.clear()
+        await callback.answer()
 
 
 @router.message(ScanStates.waiting_for_photo, F.content_type == "photo")
