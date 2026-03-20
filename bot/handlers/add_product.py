@@ -13,6 +13,7 @@ from ..services.api_client import APIClient
 from ..keyboards.main_menu import get_main_keyboard, get_cancel_keyboard, get_cancel_inline_keyboard, get_add_choose_keyboard
 from ..keyboards.categories import get_categories_keyboard
 from ..config import settings
+from .scan_product import ScanStates
 
 logger = logging.getLogger(__name__)
 
@@ -51,6 +52,7 @@ async def start_add_product(message: Message, state: FSMContext):
     
     # Reset state
     await state.clear()
+    await state.set_state(ScanStates.waiting_for_photo)
     
     # Show choose method keyboard with WebApp button
     webapp_url = settings.API_EXTERNAL_URL + '/webapp'
