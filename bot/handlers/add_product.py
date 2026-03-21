@@ -22,15 +22,6 @@ logger = logging.getLogger(__name__)
 router = Router()
 
 
-@router.callback_query()
-async def debug_all_callbacks(callback: CallbackQuery):
-    """DEBUG: Log ALL incoming callbacks to see what reaches the bot."""
-    logger.info(f"DEBUG_CALLBACK: callback_id={callback.id}, data={callback.data}, from_user={callback.from_user.id}")
-    if callback.data:
-        logger.info(f"DEBUG_CALLBACK_DATA: {callback.data[:200]}")
-    raise ValueError("DEBUG: Stop here to see what callbacks arrive")
-
-
 class AddProductState(StatesGroup):
     """FSM states for adding product."""
     name = State()
@@ -53,13 +44,103 @@ PRODUCT_ADDED = "✅ Продукт добавлен в холодильник!"
 CANCELLED = "❌ Добавление отменено"
 
 
+async def process_webapp_result(message_or_callback, state: FSMContext, api_client: APIClient, scan_data: dict, is_callback: bool = False):
+    """Process webapp scan result and show product info."""
+    telegram_id = message_or_callback.from_user.id
+    
+    raw_data = scan_data.get('raw', '')
+    gtin = scan_data.get('gtin')
+    
+    if not gtin:
+        await message_or_callback.answer(
+            "❌ Не удалось извлечь GTIN из кода. Попробуйте еще раз или введите вручную: /add",
+            reply_markup=get_main_keyboard()
+        )
+        await state.clear()
+        if is_callback:
+            await message_or_callback.answer()
+        return
+    
+    try:
+        result = await api_client.lookup_product(
+            telegram_id=telegram_id,
+            raw_data=raw_data,
+            gtin=gtin
+        )
+        
+        logger.info(f"Scan result: {result}")
+        
+        if not result.get('success'):
+            await message_or_callback.answer(
+                f"❌ Ошибка: {result.get('message', 'Неизвестная ошибка')}",
+                reply_markup=get_main_keyboard()
+            )
+            await state.clear()
+            if is_callback:
+                await message_or_callback.answer()
+            return
+        
+        if result.get('product_name'):
+            default_shelf = result.get('default_shelf_life') or 7
+            exp_info = ""
+            if result.get('expiration_date'):
+                exp_info = f"Срок годности (из кода): {result['expiration_date']}\n"
+            exp_info += f"Или будет использован срок по умолчанию: {default_shelf} дней"
+            
+            text = f"""📦 Найден товар:
+
+Название: {result['product_name']}
+Категория: {result.get('category_name', 'Неизвестно')}
+Бренд: {result.get('brand_name', 'Неизвестно')}
+GTIN: {result['gtin']}
+Срок годности (по умолчанию): {default_shelf} дней
+
+{exp_info}"""
+            
+            await state.update_data(scan_result=result)
+            await state.set_state(ScanStates.editing_product)
+            
+            if is_callback:
+                await message_or_callback.message.answer(text, reply_markup=get_scan_confirm_keyboard())
+            else:
+                await message_or_callback.answer(text, reply_markup=get_scan_confirm_keyboard())
+            if is_callback:
+                await message_or_callback.answer()
+        else:
+            await message_or_callback.answer(
+                f"❌ Товар не найден в базе\n\nGTIN: {result.get('gtin', 'N/A')}",
+                reply_markup=get_main_keyboard()
+            )
+            await state.clear()
+            if is_callback:
+                await message_or_callback.answer()
+            
+    except Exception as e:
+        logger.error(f"Error processing webapp result: {e}", exc_info=True)
+        await message_or_callback.answer(
+            f"❌ Ошибка обработки: {str(e)}",
+            reply_markup=get_main_keyboard()
+        )
+        await state.clear()
+        if is_callback:
+            await message_or_callback.answer()
+
+
 @router.message(Command("add"))
 @router.message(F.text == "➕ Добавить")
-async def start_add_product(message: Message, state: FSMContext):
-    """Show choose add method keyboard."""
+async def start_add_product(message: Message, state: FSMContext, api_client: APIClient):
+    """Show choose add method keyboard or process webapp scan result."""
     telegram_id = message.from_user.id
     
     logger.info(f"User {telegram_id} started add product")
+    
+    # Check for webapp scan result first
+    scan_result = await api_client.get_webapp_scan_result(telegram_id)
+    
+    if scan_result:
+        logger.info(f"Found webapp scan result for user {telegram_id}: {scan_result}")
+        await process_webapp_result(message, state, api_client, scan_result)
+        return
     
     # Reset state
     await state.clear()

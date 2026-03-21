@@ -241,6 +241,23 @@ class APIClient:
         data = response.json()
         return data.get("products", [])
 
+    async def get_webapp_scan_result(self, telegram_id: int) -> Optional[dict]:
+        """Get scan result from Mini App (one-time, consumes the result)."""
+        response = await self.client.get(
+            f"{self.base_url}/scan/webapp/result",
+            params={"telegram_id": telegram_id}
+        )
+        
+        if response.status_code == 404:
+            return None
+        
+        response.raise_for_status()
+        data = response.json()
+        return data
+        response.raise_for_status()
+        data = response.json()
+        return data.get("products", [])
+
     # ==================== Notifications ====================
 
     async def get_notification_settings(

@@ -119,7 +119,7 @@ function showError(text, isPermanent = false) {
     }
 }
 
-function sendToBot(text, format) {
+async function sendToBot(text, format) {
     // Extract GTIN from DataMatrix if possible
     let gtin = null;
     let serial = null;
@@ -142,36 +142,37 @@ function sendToBot(text, format) {
         serial = serialMatch[1].trim();
     }
     
-    const result = {
-        raw: rawData,
-        format: format,
-        gtin: gtin,
-        serial: serial,
-        timestamp: new Date().toISOString()
-    };
+    console.log('Sending scan data to API:', { text, format, gtin, serial });
     
-    console.log('Sending to bot:', result);
-    
-    if (tg) {
-        // Отправляем данные в бот
-        tg.sendData(JSON.stringify(result));
-        updateStatus('Код отправлен!', false);
+    try {
+        // Send data to API endpoint
+        const telegramId = tg.initDataUnsafe?.user?.id;
         
-        // Показываем уведомление через Telegram
-        tg.showPopup({
-            title: 'Успех',
-            message: `Код ${text.substring(0, 20)}${text.length > 20 ? '...' : ''} отправлен`,
-            buttons: [{type: 'ok'}]
+        if (!telegramId) {
+            console.error('No telegram ID available');
+            tg.showPopup({
+                title: 'Ошибка',
+                message: 'Не удалось определить пользователя',
+                buttons: [{type: 'ok'}]
+            });
+            return;
+        }
+        
+        // Get API URL from parent page or use default
+        const apiUrl = window.location.origin.replace(/:\d+$/, ':8000') + '/api/v1/scan/webapp';
+        
+        const response = await fetch(`${apiUrl}?telegram_id=${telegramId}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                raw: rawData,
+                gtin: gtin,
+                serial: serial,
+                scan_format: format
+            })
         });
-        
-        // Закрываем mini app через 1.5 секунды
-        setTimeout(() => {
-            tg.close();
-        }, 1500);
-    } else {
-        console.log('No Telegram WebApp available');
-        updateStatus('Код найден: ' + text.substring(0, 30), false);
-    }
 }
 
 async function startScanner() {
