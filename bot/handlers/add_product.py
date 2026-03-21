@@ -1,5 +1,6 @@
 """Handler for adding products to fridge."""
 
+import json
 import logging
 from datetime import datetime, date
 
@@ -12,6 +13,7 @@ from aiogram.fsm.state import State, StatesGroup
 from ..services.api_client import APIClient
 from ..keyboards.main_menu import get_main_keyboard, get_cancel_keyboard, get_cancel_inline_keyboard, get_add_choose_keyboard
 from ..keyboards.categories import get_categories_keyboard
+from ..keyboards.scan_keyboard import get_scan_confirm_keyboard
 from ..config import settings
 from .scan_product import ScanStates
 
@@ -227,3 +229,141 @@ async def cancel_add_callback(callback: CallbackQuery, state: FSMContext):
     await callback.message.edit_text(CANCELLED, reply_markup=None)
     await callback.message.answer("Выберите действие:", reply_markup=get_main_keyboard())
     await callback.answer()
+
+
+@router.callback_query(ScanStates.editing_product, F.data == "scan_confirm")
+async def confirm_scan(callback: CallbackQuery, state: FSMContext, api_client: APIClient):
+    """Confirm and add scanned product."""
+    telegram_id = callback.from_user.id
+    data = await state.get_data()
+    scan_result = data.get('scan_result')
+    
+    try:
+        expiration_date = scan_result.get('expiration_date')
+        if not expiration_date:
+            default_shelf = scan_result.get('default_shelf_life') or 7
+            expiration_date = (date.today() + __import__('datetime').timedelta(days=default_shelf)).isoformat()
+        
+        await api_client.add_fridge_item(
+            telegram_id=telegram_id,
+            product_name=scan_result['product_name'],
+            category_id=scan_result.get('category_id'),
+            brand_name=scan_result.get('brand_name'),
+            quantity=1,
+            expiration_date=expiration_date
+        )
+        
+        await callback.message.edit_text("✅ Товар добавлен в холодильник!", reply_markup=None)
+        await callback.message.answer("Выберите действие:", reply_markup=get_main_keyboard())
+        
+    except Exception as e:
+        logger.error(f"Error adding scanned product: {e}", exc_info=True)
+        await callback.message.edit_text(f"❌ Ошибка: {str(e)}", reply_markup=None)
+        await callback.message.answer(reply_markup=get_main_keyboard())
+    
+    await callback.answer()
+    await state.clear()
+
+
+@router.callback_query(ScanStates.editing_product, F.data == "scan_cancel")
+async def cancel_scan(callback: CallbackQuery, state: FSMContext):
+    """Cancel scanning."""
+    await callback.message.edit_text("❌ Сканирование отменено", reply_markup=None)
+    await callback.message.answer(reply_markup=get_main_keyboard())
+    await callback.answer()
+    await state.clear()
+
+
+@router.callback_query(ScanStates.waiting_for_photo)
+async def process_webapp_scan(callback: CallbackQuery, state: FSMContext, api_client: APIClient):
+    """Process data received from WebApp Mini App."""
+    telegram_id = callback.from_user.id
+    logger.info(f"Processing webapp scan for user {telegram_id}, data={callback.data[:100] if callback.data else None}...")
+    
+    if not callback.data:
+        await callback.answer("Ошибка: нет данных")
+        return
+    
+    try:
+        webapp_data = json.loads(callback.data)
+        logger.info(f"WebApp scan data: {webapp_data}")
+    except json.JSONDecodeError:
+        logger.warning(f"Non-JSON callback data, ignoring: {callback.data[:50] if callback.data else None}...")
+        await callback.answer()
+        return
+    
+    processing_msg = await callback.message.answer("⏳ Обрабатываю...")
+    
+    raw_data = webapp_data.get('raw', '')
+    gtin = webapp_data.get('gtin')
+    
+    if not gtin:
+        await processing_msg.delete()
+        await callback.message.answer(
+            "❌ Не удалось извлечь GTIN из кода. Попробуйте еще раз или введите вручную: /add",
+            reply_markup=get_main_keyboard()
+        )
+        await state.clear()
+        await callback.answer()
+        return
+    
+    try:
+        result = await api_client.lookup_product(
+            telegram_id=telegram_id,
+            raw_data=raw_data,
+            gtin=gtin
+        )
+        
+        logger.info(f"Scan result: {result}")
+        
+        if not result.get('success'):
+            await processing_msg.delete()
+            await callback.message.answer(
+                f"❌ Ошибка: {result.get('message', 'Неизвестная ошибка')}",
+                reply_markup=get_main_keyboard()
+            )
+            await state.clear()
+            await callback.answer()
+            return
+        
+        if result.get('product_name'):
+            default_shelf = result.get('default_shelf_life') or 7
+            exp_info = ""
+            if result.get('expiration_date'):
+                exp_info = f"Срок годности (из кода): {result['expiration_date']}\n"
+            exp_info += f"Или будет использован срок по умолчанию: {default_shelf} дней"
+            
+            text = f"""📦 Найден товар:
+
+Название: {result['product_name']}
+Категория: {result.get('category_name', 'Неизвестно')}
+Бренд: {result.get('brand_name', 'Неизвестно')}
+GTIN: {result['gtin']}
+Срок годности (по умолчанию): {default_shelf} дней
+
+{exp_info}"""
+            
+            await state.update_data(scan_result=result)
+            
+            await processing_msg.delete()
+            await callback.message.answer(text, reply_markup=get_scan_confirm_keyboard())
+            await state.set_state(ScanStates.editing_product)
+            await callback.answer()
+        else:
+            await processing_msg.delete()
+            await callback.message.answer(
+                f"❌ Товар не найден в базе\n\nGTIN: {result.get('gtin', 'N/A')}",
+                reply_markup=get_main_keyboard()
+            )
+            await state.clear()
+            await callback.answer()
+            
+    except Exception as e:
+        logger.error(f"Error processing webapp data: {e}", exc_info=True)
+        await processing_msg.delete()
+        await callback.message.answer(
+            f"❌ Ошибка обработки: {str(e)}",
+            reply_markup=get_main_keyboard()
+        )
+        await state.clear()
+        await callback.answer()
