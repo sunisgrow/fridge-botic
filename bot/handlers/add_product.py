@@ -22,6 +22,15 @@ logger = logging.getLogger(__name__)
 router = Router()
 
 
+@router.callback_query()
+async def debug_all_callbacks(callback: CallbackQuery):
+    """DEBUG: Log ALL incoming callbacks to see what reaches the bot."""
+    logger.info(f"DEBUG_CALLBACK: callback_id={callback.id}, data={callback.data}, from_user={callback.from_user.id}")
+    if callback.data:
+        logger.info(f"DEBUG_CALLBACK_DATA: {callback.data[:200]}")
+    raise ValueError("DEBUG: Stop here to see what callbacks arrive")
+
+
 class AddProductState(StatesGroup):
     """FSM states for adding product."""
     name = State()
