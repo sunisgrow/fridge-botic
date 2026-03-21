@@ -158,8 +158,9 @@ async function sendToBot(text, format) {
             return;
         }
         
-        // Get API URL from parent page or use default
-        const apiUrl = window.location.origin.replace(/:\d+$/, ':8000') + '/api/v1/scan/webapp';
+        // Get API URL from same origin (port 8443)
+        const apiUrl = window.location.origin + '/api/v1/scan/webapp';
+        console.log('API URL:', apiUrl);
         
         const response = await fetch(`${apiUrl}?telegram_id=${telegramId}`, {
             method: 'POST',
@@ -173,6 +174,29 @@ async function sendToBot(text, format) {
                 scan_format: format
             })
         });
+        
+        if (response.ok) {
+            updateStatus('Код отправлен!', false);
+            tg.showPopup({
+                title: 'Успех',
+                message: `Код ${text.substring(0, 20)}${text.length > 20 ? '...' : ''} отправлен`,
+                buttons: [{type: 'ok'}]
+            });
+            setTimeout(() => {
+                tg.close();
+            }, 1500);
+        } else {
+            throw new Error(`HTTP ${response.status}`);
+        }
+    } catch (error) {
+        console.error('Error sending to API:', error);
+        updateStatus('Ошибка отправки', false, true);
+        tg.showPopup({
+            title: 'Ошибка',
+            message: 'Не удалось отправить данные. Попробуйте еще раз.',
+            buttons: [{type: 'ok'}]
+        });
+    }
 }
 
 async function startScanner() {
