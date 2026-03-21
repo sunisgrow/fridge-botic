@@ -274,14 +274,14 @@ async def cancel_scan(callback: CallbackQuery, state: FSMContext):
     await state.clear()
 
 
-@router.callback_query(ScanStates.waiting_for_photo)
+@router.callback_query()
 async def process_webapp_scan(callback: CallbackQuery, state: FSMContext, api_client: APIClient):
     """Process data received from WebApp Mini App."""
     telegram_id = callback.from_user.id
-    logger.info(f"Processing webapp scan for user {telegram_id}, data={callback.data[:100] if callback.data else None}...")
+    logger.info(f"Processing callback for user {telegram_id}, data={callback.data[:100] if callback.data else None}...")
     
     if not callback.data:
-        await callback.answer("Ошибка: нет данных")
+        await callback.answer()
         return
     
     try:
