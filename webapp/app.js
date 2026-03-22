@@ -205,21 +205,18 @@ async function startScanner() {
         return;
     }
     
-    // Проверяем поддержку getUserMedia
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        showError('Ваш браузер не поддерживает доступ к камере\n\nИспользуйте современный браузер (Chrome, Safari, Firefox)', true);
+        showError('Ваш браузер не поддерживает доступ к камере', true);
         return;
     }
     
-    // Проверяем HTTPS (обязательно для getUserMedia)
     if (location.protocol !== 'https:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
-        showError('Для доступа к камере требуется HTTPS соединение\n\nТекущий протокол: ' + location.protocol, true);
+        showError('Для доступа к камере требуется HTTPS соединение', true);
         return;
     }
     
-    // Проверяем, что библиотека загружена
     if (typeof Html5Qrcode === 'undefined') {
-        showError('Библиотека сканирования не загружена\nПроверьте интернет-соединение', true);
+        showError('Библиотека сканирования не загружена', true);
         return;
     }
     
@@ -229,32 +226,14 @@ async function startScanner() {
     startBtn.classList.add('hidden');
     stopBtn.classList.remove('hidden');
     
-    updateStatus('Запрос доступа к камере...', true);
+    updateStatus('Запуск камеры...', true);
     
     try {
-        // Получаем список доступных камер (используем кэш если есть)
-        let cameras = cachedCameras;
-        if (!cameras) {
-            cameras = await Html5Qrcode.getCameras();
-            cachedCameras = cameras;
-        }
-        console.log('Available cameras:', cameras);
+        // Инициализируем сканер сразу
+        html5Qrcode = new Html5Qrcode("reader");
         
-        if (!cameras || cameras.length === 0) {
-            throw new Error('Камеры не найдены на устройстве');
-        }
-        
-        // Выбираем заднюю камеру если есть
-        const backCamera = cameras.find(camera => 
-            camera.label.toLowerCase().includes('back') || 
-            camera.label.toLowerCase().includes('environment') ||
-            camera.label.toLowerCase().includes('rear')
-        );
-        
-        currentCameraId = backCamera ? backCamera.id : cameras[0].id;
-        console.log('Selected camera:', currentCameraId);
-        
-        // Создаем конфигурацию для сканера
+        // Конфигурация: используем environment (заднюю камеру) по умолчанию
+        // Это избавляет от необходимости вызывать getCameras() отдельно
         const config = {
             fps: 15,
             qrbox: { width: 280, height: 280 },
@@ -273,20 +252,15 @@ async function startScanner() {
             ]
         };
         
-        // Инициализируем сканер
-        html5Qrcode = new Html5Qrcode("reader");
-        
-        updateStatus('Запуск камеры...', true);
-        
         // Запускаем сканирование
+        // Используем { facingMode: "environment" } вместо ID камеры
         await html5Qrcode.start(
-            currentCameraId,
+            { facingMode: "environment" }, 
             config,
             (decodedText, decodedResult) => {
                 // Успешное сканирование
                 console.log('Code found:', decodedText);
                 
-                // Останавливаем сканирование
                 if (html5Qrcode && isScanning) {
                     html5Qrcode.stop().then(() => {
                         isScanning = false;
@@ -303,47 +277,21 @@ async function startScanner() {
                 }
             },
             (errorMessage) => {
-                // Игнорируем ошибки сканирования (они возникают постоянно)
-                // Но логируем для отладки
-                if (errorMessage && !errorMessage.includes('No MultiFormat')) {
-                    console.debug('Scan error:', errorMessage);
-                }
+                // Игнорируем ошибки сканирования
             }
         );
         
         updateStatus('Сканирование... Наведите камеру на штрихкод', true);
         
-        // Проверяем поддержку фонарика
-        try {
-            const stream = await navigator.mediaDevices.getUserMedia({
-                video: { deviceId: { exact: currentCameraId } }
-            });
-            const track = stream.getVideoTracks()[0];
-            if (track) {
-                const capabilities = track.getCapabilities();
-                if (capabilities.torch) {
-                    torchAvailable = true;
-                    torchBtn.classList.remove('hidden');
-                    
-                    let torchOn = false;
-                    torchBtn.onclick = async () => {
-                        try {
-                            torchOn = !torchOn;
-                            await track.applyConstraints({
-                                advanced: [{ torch: torchOn }]
-                            });
-                            torchBtn.textContent = torchOn ? '🔦 Фонарик (вкл)' : '🔦 Фонарик';
-                        } catch (e) {
-                            console.log('Torch toggle failed:', e);
-                        }
-                    };
-                }
-            }
-            stream.getTracks().forEach(track => track.stop());
-        } catch (e) {
-            console.log('Torch not supported:', e);
-        }
-        
+        // --- УПРОЩЕННАЯ ЛОГИКА ФОНАРИКА ---
+        // Мы не создаем новый поток! Пробуем применить ограничения к текущему.
+        // К сожалению, html5-qrcode не дает простого доступа к треку, 
+        // поэтому надежнее просто скрыть кнопку фонарика или управлять ею через API библиотеки, если версия новая.
+        // В старых версиях библиотеки управлять фонариком сложно без хаков.
+        // Лучший вариант здесь — убрать блок с getUserMedia полностью.
+        torchBtn.classList.add('hidden'); // Скрываем кнопку фонарика для простоты, или используем API библиотеки, если оно есть.
+        // Если очень нужен фонарик, его можно включить через scanStart callback в новых версиях библиотеки.
+
     } catch (err) {
         console.error('Failed to start scanner:', err);
         isScanning = false;
@@ -353,13 +301,9 @@ async function startScanner() {
         let errorMessage = 'Не удалось запустить камеру.\n\n';
         
         if (err.message && err.message.includes('Permission')) {
-            errorMessage += '❌ Разрешите доступ к камере:\n';
-            errorMessage += '• В Telegram: нажмите ⋮ → Настройки → Камера\n';
-            errorMessage += '• В браузере: нажмите на 🔒 в адресной строке\n';
-            errorMessage += '• Разрешите доступ и перезагрузите страницу';
+            errorMessage += '❌ Разрешите доступ к камере в настройках браузера или Telegram.';
         } else if (err.message && err.message.includes('not found')) {
-            errorMessage += '📱 Камера не обнаружена на устройстве.\n';
-            errorMessage += 'Убедитесь, что камера работает и доступна.';
+            errorMessage += '📱 Камера не обнаружена.';
         } else {
             errorMessage += err.message || 'Неизвестная ошибка';
         }
@@ -369,24 +313,25 @@ async function startScanner() {
     }
 }
 
-async function stopScanner() {
-    if (!isScanning) return;
+// Проверка поддержки камеры при загрузке (БЕЗ запроса разрешения)
+async function checkCameraSupport() {
+    console.log('Checking camera support...');
     
-    try {
-        if (html5Qrcode && html5Qrcode.isScanning) {
-            await html5Qrcode.stop();
-        }
-    } catch (err) {
-        console.error('Error stopping scanner:', err);
+    // Проверяем только наличие API, но не запрашиваем камеры!
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        showError('Ваш браузер не поддерживает доступ к камере', true);
+        updateStatus('Камера не поддерживается', false, true);
+        return;
     }
     
-    isScanning = false;
-    startBtn.classList.remove('hidden');
-    stopBtn.classList.add('hidden');
-    torchBtn.classList.add('hidden');
-    torchAvailable = false;
+    if (location.protocol !== 'https:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
+        showError('⚠️ Для работы камеры требуется HTTPS', true);
+        updateStatus('Требуется HTTPS', false, true);
+        return;
+    }
     
-    updateStatus('Готов к сканированию');
+    // Просто обновляем статус. Разрешение спросим только по кнопке.
+    updateStatus('Готов к сканированию. Нажмите кнопку.');
 }
 
 function getFormatName(format) {
