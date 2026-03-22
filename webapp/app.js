@@ -142,60 +142,81 @@ async function sendToBot(text, format) {
         serial = serialMatch[1].trim();
     }
     
-    console.log('Sending scan data to API:', { text, format, gtin, serial });
+    console.log('Sending scan data:', { text, format, gtin, serial });
     
-    try {
-        // Send data to API endpoint
-        const telegramId = tg.initDataUnsafe?.user?.id;
+    // Prepare data to send back to bot via Telegram
+    const scanData = JSON.stringify({
+        raw: rawData,
+        gtin: gtin,
+        serial: serial,
+        scan_format: format
+    });
+    
+    // Use tg.sendData to send data back to bot
+    // This works with KeyboardButton (not InlineKeyboardButton)
+    if (tg && tg.sendData) {
+        tg.sendData(scanData);
         
-        if (!telegramId) {
-            console.error('No telegram ID available');
-            tg.showPopup({
-                title: 'Ошибка',
-                message: 'Не удалось определить пользователя',
-                buttons: [{type: 'ok'}]
-            });
-            return;
-        }
-        
-        // Get API URL from same origin (port 8443)
-        const apiUrl = window.location.origin + '/api/v1/scan/webapp';
-        console.log('API URL:', apiUrl);
-        
-        const response = await fetch(`${apiUrl}?telegram_id=${telegramId}`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                raw: rawData,
-                gtin: gtin,
-                serial: serial,
-                scan_format: format
-            })
-        });
-        
-        if (response.ok) {
-            updateStatus('Код отправлен!', false);
-            tg.showPopup({
-                title: 'Успех',
-                message: `Код ${text.substring(0, 20)}${text.length > 20 ? '...' : ''} отправлен`,
-                buttons: [{type: 'ok'}]
-            });
-            setTimeout(() => {
-                tg.close();
-            }, 1500);
-        } else {
-            throw new Error(`HTTP ${response.status}`);
-        }
-    } catch (error) {
-        console.error('Error sending to API:', error);
-        updateStatus('Ошибка отправки', false, true);
+        updateStatus('Код отправлен!', false);
         tg.showPopup({
-            title: 'Ошибка',
-            message: 'Не удалось отправить данные. Попробуйте еще раз.',
+            title: 'Успех',
+            message: `Код ${text.substring(0, 20)}${text.length > 20 ? '...' : ''} отправлен`,
             buttons: [{type: 'ok'}]
         });
+        
+        // Close the WebApp after a short delay
+        setTimeout(() => {
+            tg.close();
+        }, 1000);
+    } else {
+        // Fallback: send to API (for debugging or if sendData not available)
+        console.log('tg.sendData not available, falling back to API');
+        
+        try {
+            const telegramId = tg.initDataUnsafe?.user?.id;
+            
+            if (!telegramId) {
+                console.error('No telegram ID available');
+                tg.showPopup({
+                    title: 'Ошибка',
+                    message: 'Не удалось определить пользователя',
+                    buttons: [{type: 'ok'}]
+                });
+                return;
+            }
+            
+            const apiUrl = window.location.origin + '/api/v1/scan/webapp';
+            
+            const response = await fetch(`${apiUrl}?telegram_id=${telegramId}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: scanData
+            });
+            
+            if (response.ok) {
+                updateStatus('Код отправлен!', false);
+                tg.showPopup({
+                    title: 'Успех',
+                    message: `Код ${text.substring(0, 20)}${text.length > 20 ? '...' : ''} отправлен`,
+                    buttons: [{type: 'ok'}]
+                });
+                setTimeout(() => {
+                    tg.close();
+                }, 1500);
+            } else {
+                throw new Error(`HTTP ${response.status}`);
+            }
+        } catch (error) {
+            console.error('Error sending to API:', error);
+            updateStatus('Ошибка отправки', false, true);
+            tg.showPopup({
+                title: 'Ошибка',
+                message: 'Не удалось отправить данные. Попробуйте еще раз.',
+                buttons: [{type: 'ok'}]
+            });
+        }
     }
 }
 
