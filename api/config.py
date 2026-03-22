@@ -4,6 +4,7 @@ import os
 from pydantic_settings import BaseSettings
 
 
+
 class Settings(BaseSettings):
     """API settings from environment variables."""
 
@@ -13,7 +14,7 @@ class Settings(BaseSettings):
     DEBUG: bool = False
 
     # Database
-    DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/fridge_bot"
+    DATABASE_URL: str
 
     # Redis
     REDIS_URL: str = "redis://localhost:6379/0"

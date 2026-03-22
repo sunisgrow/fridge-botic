@@ -8,14 +8,11 @@ class Settings(BaseSettings):
     """Bot settings from environment variables."""
 
     # Telegram
-    TELEGRAM_BOT_TOKEN: str = ""
+    TELEGRAM_BOT_TOKEN: str 
 
     # API
-    API_URL: str = "http://localhost:8000/api/v1"
-    API_EXTERNAL_URL: str = "http://localhost:8080"
-
-    # Database
-    DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/fridge_bot"
+    API_URL: str 
+    API_EXTERNAL_URL: str 
 
     # Redis
     REDIS_URL: str = "redis://localhost:6379/0"
