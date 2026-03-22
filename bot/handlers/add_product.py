@@ -128,25 +128,15 @@ GTIN: {result['gtin']}
 
 @router.message(Command("add"))
 @router.message(F.text == "➕ Добавить")
-async def start_add_product(message: Message, state: FSMContext, api_client: APIClient):
-    """Show choose add method keyboard or process webapp scan result."""
+async def start_add_product(message: Message, state: FSMContext):
+    """Show choose add method keyboard."""
     telegram_id = message.from_user.id
     
     logger.info(f"User {telegram_id} started add product")
     
-    # Check for webapp scan result first
-    scan_result = await api_client.get_webapp_scan_result(telegram_id)
-    
-    if scan_result:
-        logger.info(f"Found webapp scan result for user {telegram_id}: {scan_result}")
-        await process_webapp_result(message, state, api_client, scan_result)
-        return
-    
-    # Reset state
     await state.clear()
     await state.set_state(ScanStates.waiting_for_photo)
     
-    # Show choose method keyboard with WebApp button
     webapp_url = settings.API_EXTERNAL_URL + '/webapp'
     await message.answer(
         CHOOSE_ADD_METHOD,
@@ -154,33 +144,49 @@ async def start_add_product(message: Message, state: FSMContext, api_client: API
     )
 
 
-@router.callback_query(F.data == "add_choose_photo")
-async def add_by_photo(callback: CallbackQuery, state: FSMContext):
-    """Start scanning via photo upload."""
-    from .scan_product import ScanStates, SCAN_START
+@router.message(F.web_app_data)
+async def handle_webapp_scan(message: Message, state: FSMContext, api_client: APIClient):
+    """Handle data received from WebApp Mini App via KeyboardButton."""
+    telegram_id = message.from_user.id
+    logger.info(f"Processing web_app_data for user {telegram_id}")
     
-    telegram_id = callback.from_user.id
+    try:
+        scan_data = json.loads(message.web_app_data.data)
+        logger.info(f"WebApp scan data: {scan_data}")
+        await process_webapp_result(message, state, api_client, scan_data, is_callback=False)
+    except json.JSONDecodeError:
+        logger.error(f"Failed to parse web_app_data: {message.web_app_data.data}")
+        await message.answer(
+            "❌ Ошибка обработки данных сканера",
+            reply_markup=get_main_keyboard()
+        )
+        await state.clear()
+
+
+@router.message(F.text == "📸 Загрузить фото")
+async def add_by_photo(message: Message, state: FSMContext):
+    """Start scanning via photo upload."""
+    from .scan_product import SCAN_START
+    
+    telegram_id = message.from_user.id
     logger.info(f"User {telegram_id} chose scan via photo")
     
     await state.clear()
     await state.set_state(ScanStates.waiting_for_photo)
     
-    await callback.message.edit_text(SCAN_START)
-    await callback.answer()
+    await message.answer(SCAN_START)
 
 
-@router.callback_query(F.data == "add_choose_manual")
-async def add_manually(callback: CallbackQuery, state: FSMContext, api_client: APIClient):
+@router.message(F.text == "✏️ Вручную")
+async def add_manually(message: Message, state: FSMContext):
     """Start manual input."""
-    telegram_id = callback.from_user.id
+    telegram_id = message.from_user.id
     logger.info(f"User {telegram_id} chose manual method")
     
-    # Clear state and set add state
     await state.clear()
     await state.set_state(AddProductState.name)
     
-    await callback.message.edit_text(ENTER_NAME, reply_markup=get_cancel_inline_keyboard())
-    await callback.answer()
+    await message.answer(ENTER_NAME, reply_markup=get_cancel_keyboard())
 
 
 @router.message(AddProductState.name)
@@ -362,98 +368,3 @@ async def cancel_scan(callback: CallbackQuery, state: FSMContext):
     await callback.message.answer(reply_markup=get_main_keyboard())
     await callback.answer()
     await state.clear()
-
-
-@router.callback_query()
-async def process_webapp_scan(callback: CallbackQuery, state: FSMContext, api_client: APIClient):
-    """Process data received from WebApp Mini App."""
-    telegram_id = callback.from_user.id
-    logger.info(f"Processing callback for user {telegram_id}, data={callback.data[:100] if callback.data else None}...")
-    
-    if not callback.data:
-        await callback.answer()
-        return
-    
-    try:
-        webapp_data = json.loads(callback.data)
-        logger.info(f"WebApp scan data: {webapp_data}")
-    except json.JSONDecodeError:
-        logger.warning(f"Non-JSON callback data, ignoring: {callback.data[:50] if callback.data else None}...")
-        await callback.answer()
-        return
-    
-    processing_msg = await callback.message.answer("⏳ Обрабатываю...")
-    
-    raw_data = webapp_data.get('raw', '')
-    gtin = webapp_data.get('gtin')
-    
-    if not gtin:
-        await processing_msg.delete()
-        await callback.message.answer(
-            "❌ Не удалось извлечь GTIN из кода. Попробуйте еще раз или введите вручную: /add",
-            reply_markup=get_main_keyboard()
-        )
-        await state.clear()
-        await callback.answer()
-        return
-    
-    try:
-        result = await api_client.lookup_product(
-            telegram_id=telegram_id,
-            raw_data=raw_data,
-            gtin=gtin
-        )
-        
-        logger.info(f"Scan result: {result}")
-        
-        if not result.get('success'):
-            await processing_msg.delete()
-            await callback.message.answer(
-                f"❌ Ошибка: {result.get('message', 'Неизвестная ошибка')}",
-                reply_markup=get_main_keyboard()
-            )
-            await state.clear()
-            await callback.answer()
-            return
-        
-        if result.get('product_name'):
-            default_shelf = result.get('default_shelf_life') or 7
-            exp_info = ""
-            if result.get('expiration_date'):
-                exp_info = f"Срок годности (из кода): {result['expiration_date']}\n"
-            exp_info += f"Или будет использован срок по умолчанию: {default_shelf} дней"
-            
-            text = f"""📦 Найден товар:
-
-Название: {result['product_name']}
-Категория: {result.get('category_name', 'Неизвестно')}
-Бренд: {result.get('brand_name', 'Неизвестно')}
-GTIN: {result['gtin']}
-Срок годности (по умолчанию): {default_shelf} дней
-
-{exp_info}"""
-            
-            await state.update_data(scan_result=result)
-            
-            await processing_msg.delete()
-            await callback.message.answer(text, reply_markup=get_scan_confirm_keyboard())
-            await state.set_state(ScanStates.editing_product)
-            await callback.answer()
-        else:
-            await processing_msg.delete()
-            await callback.message.answer(
-                f"❌ Товар не найден в базе\n\nGTIN: {result.get('gtin', 'N/A')}",
-                reply_markup=get_main_keyboard()
-            )
-            await state.clear()
-            await callback.answer()
-            
-    except Exception as e:
-        logger.error(f"Error processing webapp data: {e}", exc_info=True)
-        await processing_msg.delete()
-        await callback.message.answer(
-            f"❌ Ошибка обработки: {str(e)}",
-            reply_markup=get_main_keyboard()
-        )
-        await state.clear()
-        await callback.answer()
