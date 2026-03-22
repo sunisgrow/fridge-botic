@@ -328,7 +328,8 @@ async def get_items(telegram_id: int) -> List[Item]:
 ---
 
 ## Important Notes
-
+### Coding
+Always use Context7 when I need library/API documentation, code generation, setup or configuration steps without me having to explicitly ask.
 ### WebApp Data Handling
 When using Telegram Mini App with InlineKeyboardButton:
 - Mini App opens via WebApp button
