@@ -3,9 +3,6 @@
 
 let html5Qrcode = null;
 let isScanning = false;
-let currentCameraId = null;
-let torchAvailable = false;
-let cachedCameras = null;
 
 // Initialize Telegram WebApp
 const tg = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
@@ -334,27 +331,6 @@ async function startScanner() {
     }
 }
 
-// Проверка поддержки камеры при загрузке (БЕЗ запроса разрешения)
-async function checkCameraSupport() {
-    console.log('Checking camera support...');
-    
-    // Проверяем только наличие API, но не запрашиваем камеры!
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        showError('Ваш браузер не поддерживает доступ к камере', true);
-        updateStatus('Камера не поддерживается', false, true);
-        return;
-    }
-    
-    if (location.protocol !== 'https:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
-        showError('⚠️ Для работы камеры требуется HTTPS', true);
-        updateStatus('Требуется HTTPS', false, true);
-        return;
-    }
-    
-    // Просто обновляем статус. Разрешение спросим только по кнопке.
-    updateStatus('Готов к сканированию. Нажмите кнопку.');
-}
-
 function getFormatName(format) {
     const formatNames = {
         'DATA_MATRIX': 'DataMatrix (Честный знак)',
@@ -386,16 +362,15 @@ if (stopBtn) {
     });
 }
 
-// Проверка поддержки камеры при загрузке
+// Проверка поддержки камеры при загрузке (разрешение запрашивается только в startScanner)
 async function checkCameraSupport() {
     console.log('Checking camera support...');
     
-    // Проверяем наличие необходимых API
+    // Проверяем наличие библиотеки
     if (typeof Html5Qrcode === 'undefined') {
         console.error('Html5Qrcode library not loaded');
         updateStatus('Загрузка библиотеки...', false);
         
-        // Ждем загрузки библиотеки
         let attempts = 0;
         const checkInterval = setInterval(() => {
             if (typeof Html5Qrcode !== 'undefined') {
@@ -409,42 +384,21 @@ async function checkCameraSupport() {
         return;
     }
     
+    // Проверяем базовую поддержку
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        showError('Ваш браузер не поддерживает доступ к камере\n\nРекомендуем использовать:\n• Chrome на Android\n• Safari на iOS\n• Telegram Desktop на ПК', true);
+        showError('Ваш браузер не поддерживает доступ к камере', true);
         updateStatus('Камера не поддерживается', false, true);
         return;
     }
     
     if (location.protocol !== 'https:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
-        showError('⚠️ Для работы камеры требуется HTTPS\n\nТекущий протокол: ' + location.protocol, true);
+        showError('⚠️ Для работы камеры требуется HTTPS', true);
         updateStatus('Требуется HTTPS', false, true);
         return;
     }
     
-    // Кэшируем список камер сразу (один раз запросит разрешение)
-    try {
-        cachedCameras = await Html5Qrcode.getCameras();
-        console.log('Cameras found:', cachedCameras.length);
-        
-        if (cachedCameras && cachedCameras.length > 0) {
-            updateStatus('✅ Камера готова. Нажмите "Начать сканирование"');
-            
-            // Показываем уведомление в Telegram
-            if (tg && tg.platform !== 'unknown') {
-                tg.showPopup({
-                    title: 'Готов к работе',
-                    message: 'Камера обнаружена. Нажмите кнопку "Начать сканирование" для запуска',
-                    buttons: [{type: 'ok'}]
-                });
-            }
-        } else {
-            updateStatus('❌ Камера не обнаружена', false, true);
-            showError('Камера не найдена на вашем устройстве\n\nУбедитесь, что:\n• Устройство имеет камеру\n• Доступ к камере разрешен\n• Вы используете поддерживаемый браузер');
-        }
-    } catch (err) {
-        console.error('Camera check failed:', err);
-        updateStatus('Нажмите "Начать сканирование" для доступа к камере', true);
-    }
+    // Разрешение камеры запрашивается автоматически при startScanner()
+    updateStatus('Готов к сканированию. Нажмите "Начать сканирование".');
 }
 
 // Запускаем проверку после загрузки страницы
