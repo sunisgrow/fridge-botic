@@ -5,6 +5,12 @@ from typing import Optional
 from pydantic import BaseModel, Field
 
 
+class WebAppScanRequest(BaseModel):
+    """Schema for WebApp scan request."""
+    raw: str = Field(..., description="Raw barcode/GS1 data")
+    scan_format: Optional[str] = Field(None, description="Format: DATA_MATRIX, QR_CODE, EAN_13, etc.")
+
+
 class ScanResponse(BaseModel):
     """Schema for scan response."""
     success: bool

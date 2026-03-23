@@ -7,7 +7,7 @@ from typing import Optional
 import redis.asyncio as redis
 from fastapi import APIRouter, Depends, HTTPException, Query, Body, File, UploadFile
 
-from ..schemas.scan_schema import ScanResponse
+from ..schemas.scan_schema import ScanResponse, WebAppScanRequest
 from ..services.scan_service import ScanService
 from ..config import settings
 
@@ -110,11 +110,8 @@ async def lookup_product(
 
 @router.post("/webapp")
 async def receive_webapp_scan(
-    telegram_id: int = Query(..., description="User's Telegram ID"),
-    raw: str = Body(None, description="Raw barcode data"),
-    gtin: str = Body(None, description="GTIN code"),
-    serial: str = Body(None, description="Serial number"),
-    scan_format: str = Body(None, description="Scan format")
+    request: WebAppScanRequest,
+    telegram_id: int = Query(..., description="User's Telegram ID")
 ):
     """
     Receive scan data from Mini App and store in Redis for bot to retrieve.
@@ -123,24 +120,20 @@ async def receive_webapp_scan(
     - telegram_id: User's Telegram ID (required)
     
     Request body:
-    - raw: Raw barcode data
-    - gtin: GTIN/EAN code
-    - serial: Serial number
-    - scan_format: Format name
+    - raw: Raw barcode/GS1 data
+    - scan_format: Format name (DATA_MATRIX, QR_CODE, EAN_13, etc.)
     
     Returns success status.
     """
     import time
-    logger.info(f"Received webapp scan for user {telegram_id}: gtin={gtin}")
+    logger.info(f"Received webapp scan for user {telegram_id}: format={request.scan_format}")
     
     try:
         redis_client = get_redis_client()
         
         scan_data = {
-            "raw": raw or "",
-            "gtin": gtin or "",
-            "serial": serial or "",
-            "format": scan_format or "",
+            "raw": request.raw,
+            "format": request.scan_format or "",
             "timestamp": str(int(time.time()))
         }
         

@@ -10,6 +10,7 @@ from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 
+from scanner.gs1_parser import parse_gs1, GS1ParseError
 from ..services.api_client import APIClient
 from ..keyboards.main_menu import get_main_keyboard, get_cancel_keyboard, get_cancel_inline_keyboard, get_add_choose_keyboard
 from ..keyboards.categories import get_categories_keyboard
@@ -49,7 +50,26 @@ async def process_webapp_result(message_or_callback, state: FSMContext, api_clie
     telegram_id = message_or_callback.from_user.id
     
     raw_data = scan_data.get('raw', '')
-    gtin = scan_data.get('gtin')
+    scan_format = scan_data.get('format', '')
+    
+    # Parse GS1 data if format is DataMatrix
+    gtin = None
+    gs1_data = None
+    
+    if scan_format == 'DATA_MATRIX' and raw_data:
+        try:
+            gs1_data = parse_gs1(raw_data)
+            gtin = gs1_data.get('gtin')
+            logger.info(f"GS1 parsed: gtin={gtin}, serial={gs1_data.get('serial')}")
+        except GS1ParseError as e:
+            logger.warning(f"GS1 parse error: {e}")
+    
+    # If no GTIN from GS1, try raw data as EAN/UPC
+    if not gtin and raw_data:
+        # Clean and try as EAN/UPC
+        cleaned = raw_data.strip()
+        if cleaned.isdigit() and len(cleaned) >= 8:
+            gtin = cleaned
     
     if not gtin:
         await message_or_callback.answer(

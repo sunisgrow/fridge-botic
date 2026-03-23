@@ -117,35 +117,10 @@ function showError(text, isPermanent = false) {
 }
 
 async function sendToBot(text, format) {
-    // Extract GTIN from DataMatrix if possible
-    let gtin = null;
-    let serial = null;
-    let rawData = text;
+    console.log('Sending scan data:', { text, format });
     
-    // Try to parse GS1 format
-    const gtinMatch = text.match(/\(01\)(\d{14})/);
-    if (gtinMatch) {
-        gtin = gtinMatch[1];
-    } else if (text.match(/^\d{14}$/)) {
-        gtin = text;
-    } else if (text.match(/^\d{13}$/)) {
-        gtin = '0' + text;
-    } else if (text.match(/^\d{8}$/)) {
-        gtin = '000000' + text;
-    }
-    
-    const serialMatch = text.match(/\(21\)([^(\)]+)/);
-    if (serialMatch) {
-        serial = serialMatch[1].trim();
-    }
-    
-    console.log('Sending scan data:', { text, format, gtin, serial });
-    
-    // Prepare data to send back to bot via Telegram
     const scanData = JSON.stringify({
-        raw: rawData,
-        gtin: gtin,
-        serial: serial,
+        raw: text,
         scan_format: format
     });
     
