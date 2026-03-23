@@ -331,6 +331,23 @@ async function startScanner() {
     }
 }
 
+function stopScanner() {
+    if (html5Qrcode && isScanning) {
+        html5Qrcode.stop().then(() => {
+            html5Qrcode.clear();
+            isScanning = false;
+            startBtn.classList.remove('hidden');
+            stopBtn.classList.add('hidden');
+            readerDiv.classList.add('hidden');
+            updateStatus('Сканирование остановлено');
+        }).catch(err => {
+            console.error('Error stopping scanner:', err);
+        });
+    } else {
+        console.log('Scanner not running');
+    }
+}
+
 function getFormatName(format) {
     const formatNames = {
         'DATA_MATRIX': 'DataMatrix (Честный знак)',
