@@ -56,7 +56,7 @@ async def process_webapp_result(message_or_callback, state: FSMContext, api_clie
     gtin = None
     gs1_data = None
     
-    if scan_format == 'DATA_MATRIX' and raw_data:
+    if 'DATA_MATRIX' in scan_format.upper() and raw_data:
         try:
             gs1_data = parse_gs1(raw_data)
             gtin = gs1_data.get('gtin')
