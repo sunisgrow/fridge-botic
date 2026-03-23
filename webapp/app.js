@@ -324,19 +324,8 @@ function stopScanner() {
 }
 
 function getFormatName(format) {
-    const formatNames = {
-        'DATA_MATRIX': 'DataMatrix (Честный знак)',
-        'QR_CODE': 'QR код',
-        'EAN_13': 'EAN-13',
-        'EAN_8': 'EAN-8',
-        'UPC_A': 'UPC-A',
-        'UPC_E': 'UPC-E',
-        'CODE_128': 'Code 128',
-        'CODE_39': 'Code 39',
-        'CODE_93': 'Code 93'
-    };
-    
-    return formatNames[format] || format;
+    return format;
+}
 }
 
 // Event listeners
